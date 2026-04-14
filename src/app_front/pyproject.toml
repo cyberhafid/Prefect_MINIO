@@ -1,0 +1,36 @@
+[project]
+name = "front"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "dotenv>=0.9.9",
+    "requests>=2.32.5",
+    "streamlit>=1.55.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["app_front"] 
+testpaths = ["../../tests"]
+python_files = ["test_front_*.py"]
+
+[tool.coverage.run]
+# On définit explicitement la racine de recherche du code
+source = ["./app_front"]
+# On ignore tout ce qui n'est pas dans app_front (au cas où)
+omit = [
+    "./app_api/*",
+    "app_api/*",
+    "./app_train/*",
+    "app_train/*",
+    "./tests/*",
+    "tests/*"
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.15.4",
+]

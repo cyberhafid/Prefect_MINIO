@@ -1,0 +1,101 @@
+name: Deploiement Docker
+
+# Déclenche le script à chaque "git push" sur la branche main
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  security-and-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      # 1. Verifie la sécurité du code (Gitleaks)    
+      - name: Check for secrets (Gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+ 
+  
+  test-and-deploy:
+    needs: security-and-lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "src/app_*/uv.lock"
+
+      # 3. Lance les tests (Pytest)
+      - name: Run Frontend Tests
+        working-directory: src/app_front
+        run: |
+          uv sync --project app_front --frozen --all-extras --all-groups
+          uv run python3 -m pytest
+
+      - name: Run API Tests
+        working-directory: src/app_api
+        run: |
+          uv sync --project app_api --frozen --all-extras --all-groups
+          uv run python3 -m pytest
+
+      - name: Run TRAIN Tests
+        working-directory: src/app_train
+        run: |
+          uv sync --project app_train --frozen --all-extras --all-groups
+          uv run python3 -m pytest
+
+      # 4. Connexion au Docker Hub (utilise tes Secrets GitHub)
+      - name: Login to Docker Hub
+        if: success()
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # 5. Build l'image Docker et l'envoie sur le Hub
+      - name: Build and Push Front
+        if: success()
+        uses: docker/build-push-action@v5
+        with:
+          # Le contexte de l'action reste la RACINE (là où est le docker-compose.yml)
+          context: ./src/app_front
+          # On précise le chemin du Dockerfile par rapport à la racine du REPO
+          file: ./src/app_front/Dockerfile 
+          push: true
+          # Remplace par ton pseudo Docker Hub et ton nom d'image
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/toolbox-front:latest
+
+      - name: Build and Push API
+        if: success()
+        uses: docker/build-push-action@v5
+        with:
+          # Le contexte de l'action reste la RACINE (là où est le docker-compose.yml)
+          context: ./src/app_api
+          # On précise le chemin du Dockerfile par rapport à la racine du REPO
+          file: ./src/app_api/Dockerfile 
+          push: true
+          # Remplace par ton pseudo Docker Hub et ton nom d'image
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/toolbox-api:latest
+
+      - name: Build and Push TRAIN
+        if: success()
+        uses: docker/build-push-action@v5
+        with:
+          # Le contexte de l'action reste la RACINE (là où est le docker-compose.yml)
+          context: ./src/app_train
+          # On précise le chemin du Dockerfile par rapport à la racine du REPO
+          file: ./src/app_train/Dockerfile 
+          push: true
+          # Remplace par ton pseudo Docker Hub et ton nom d'image
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/toolbox-train:latest

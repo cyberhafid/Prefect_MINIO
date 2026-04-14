@@ -1,0 +1,40 @@
+[project]
+name = "train"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "boto3>=1.42.69",
+    "dotenv>=0.9.9",
+    "mlflow>=3.10.1",
+    "prefect>=3.6.23",
+    "prefect-docker>=0.7.1",
+    "requests>=2.32.5",
+    "scikit-learn>=1.8.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["app_train"] 
+testpaths = ["../../tests"]
+python_files = ["test_train_*.py"]
+
+[tool.coverage.run]
+# On définit explicitement la racine de recherche du code
+source = ["./app_train"]
+# On ignore tout ce qui n'est pas dans app_front (au cas où)
+omit = [
+    "./app_api/*",
+    "app_api/*",
+    "./app_front/*",
+    "app_front/*",
+    "./tests/*",
+    "tests/*"
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "ruff>=0.15.4",
+]

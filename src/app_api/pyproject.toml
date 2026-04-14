@@ -1,0 +1,53 @@
+[project]
+name = "api"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "boto3",
+    "dotenv",
+    "fastapi",
+    "loguru>=0.7.3",
+    "pandas",
+    "prometheus-client>=0.24.1",
+    "protobuf",
+    "psutil>=7.2.2",
+    "prometheus_client>=0.24.1",
+    "setuptools",
+    "uvicorn",
+    "mlflow>=3.10.1",
+    "celery>=5.6.3",
+    "redis>=7.4.0",
+    "pika>=1.3.2",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["app_api"] 
+testpaths = ["../../tests"]
+python_files = ["test_api_*.py"]
+
+[tool.coverage.run]
+# On définit explicitement la racine de recherche du code
+source = ["./app_api"]
+# On ignore tout ce qui n'est pas dans app_api (au cas où)
+omit = [
+    "./app_front/*",
+    "app_front/*",
+    "./app_train/*",
+    "app_train/*",
+    "./tests/*",
+    "tests/*"
+]
+
+[tool.uv.extra-build-dependencies]
+mlflow = ["setuptools==80.10.2"]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.0.0",
+    "requests>=2.32.5",
+    "ruff>=0.15.4",
+]

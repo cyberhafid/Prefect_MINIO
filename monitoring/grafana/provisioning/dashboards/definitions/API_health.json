@@ -1,0 +1,134 @@
+{
+  "editable": true,
+  "schemaVersion": 36,
+  "title": "Iris API — Monitoring",
+  "uid": "api-health-fastapi",
+  "refresh": "5s",
+  "time": { "from": "now-1h", "to": "now" },
+  "tags": ["api", "iris"],
+  "panels": [
+
+    {
+      "id": 1, "title": "Statut API", "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [{ "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } }],
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] }
+        }
+      },
+      "targets": [{ "expr": "up{job='api-app'}", "refId": "A", "instant": true }]
+    },
+
+    {
+      "id": 2, "title": "Request Rate", "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2, "thresholds": { "mode": "absolute", "steps": [{ "color": "blue", "value": null }] } } },
+      "targets": [{ "expr": "sum(rate(app_requests_total{job='api-app'}[1m]))", "refId": "A", "instant": true }]
+    },
+
+    {
+      "id": 3, "title": "Requêtes en cours", "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 5 }, { "color": "red", "value": 20 }] }
+        }
+      },
+      "targets": [{ "expr": "app_requests_in_progress{job='api-app'}", "refId": "A", "instant": true }]
+    },
+
+    {
+      "id": 4, "title": "Error Rate", "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit", "decimals": 2,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.01 }, { "color": "red", "value": 0.05 }] }
+        }
+      },
+      "targets": [{
+        "expr": "sum(rate(app_requests_total{job='api-app', status_code=~'4..|5..'}[1m])) / sum(rate(app_requests_total{job='api-app'}[1m]))",
+        "refId": "A", "instant": true
+      }]
+    },
+
+    {
+      "id": 5, "title": "P99 Latence — /predict", "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s", "decimals": 3,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 0.5 }, { "color": "red", "value": 1 }] }
+        }
+      },
+      "targets": [{
+        "expr": "histogram_quantile(0.99, sum(rate(app_request_duration_seconds_bucket{job='api-app', endpoint='/predict'}[1m])) by (le))",
+        "refId": "A", "instant": true
+      }]
+    },
+
+    {
+      "id": 6, "title": "Requêtes totales (24h)", "type": "stat",
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 0 },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "none" },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "thresholds": { "mode": "absolute", "steps": [{ "color": "text", "value": null }] } } },
+      "targets": [{ "expr": "sum(increase(app_requests_total{job='api-app'}[24h]))", "refId": "A", "instant": true }]
+    },
+
+    {
+      "id": 10, "title": "Requêtes/s — 2xx / 4xx / 5xx", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 2, "fillOpacity": 10 } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "sum(rate(app_requests_total{job='api-app', status_code=~'2..'}[1m]))", "legendFormat": "2xx", "refId": "A" },
+        { "expr": "sum(rate(app_requests_total{job='api-app', status_code=~'4..'}[1m]))", "legendFormat": "4xx", "refId": "B" },
+        { "expr": "sum(rate(app_requests_total{job='api-app', status_code=~'5..'}[1m]))", "legendFormat": "5xx", "refId": "C" }
+      ]
+    },
+
+    {
+      "id": 11, "title": "Requêtes/s par endpoint", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "reqps", "custom": { "lineWidth": 2 } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "sum(rate(app_requests_total{job='api-app', endpoint='/predict'}[1m]))", "legendFormat": "POST /predict", "refId": "A" },
+        { "expr": "sum(rate(app_requests_total{job='api-app', endpoint='/health'}[1m]))",  "legendFormat": "GET /health",   "refId": "B" },
+        { "expr": "sum(rate(app_requests_total{job='api-app', endpoint='/'}[1m]))",        "legendFormat": "GET /",         "refId": "C" }
+      ]
+    },
+
+    {
+      "id": 20, "title": "Latence — P50 / P90 / P99", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "lineWidth": 2 } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum(rate(app_request_duration_seconds_bucket{job='api-app', endpoint='/predict'}[1m])) by (le))", "legendFormat": "P50", "refId": "A" },
+        { "expr": "histogram_quantile(0.90, sum(rate(app_request_duration_seconds_bucket{job='api-app', endpoint='/predict'}[1m])) by (le))", "legendFormat": "P90", "refId": "B" },
+        { "expr": "histogram_quantile(0.99, sum(rate(app_request_duration_seconds_bucket{job='api-app', endpoint='/predict'}[1m])) by (le))", "legendFormat": "P99", "refId": "C" }
+      ]
+    },
+
+    {
+      "id": 30, "title": "Prédictions par classe (rate/min)", "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "lineWidth": 2, "fillOpacity": 10 } } },
+      "options": { "tooltip": { "mode": "multi" } },
+      "targets": [
+        { "expr": "rate(app_predictions_total{job='api-app', predicted_class='setosa'}[1m]) * 60",     "legendFormat": "Setosa",     "refId": "A" },
+        { "expr": "rate(app_predictions_total{job='api-app', predicted_class='versicolor'}[1m]) * 60", "legendFormat": "Versicolor", "refId": "B" },
+        { "expr": "rate(app_predictions_total{job='api-app', predicted_class='virginica'}[1m]) * 60",  "legendFormat": "Virginica",  "refId": "C" }
+      ]
+    }
+
+  ]
+}

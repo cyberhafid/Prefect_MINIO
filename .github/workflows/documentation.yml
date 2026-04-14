@@ -1,0 +1,75 @@
+name: Deploy Documentation
+
+
+on:
+  push:
+    branches: [main]
+
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Install Dependencies
+        run: |
+          # 1. Installer les dépendances de la doc normalement
+          (cd docs && uv sync  --all-extras --all-groups)
+
+          # 2. Installer les dépendances des autres apps proprement
+          # On boucle sur chaque pyproject.toml et on demande à uv d'installer ses dépendances
+          find . -name "pyproject.toml" -not -path "./docs/*" -exec uv pip install -r {} \;
+
+      - name: Generate API skeleton
+        run: |
+          mkdir -p docs/source
+          # On boucle sur tous les dossiers commençant par app_
+          for dir in ../app_*; do
+            if [ -d "$dir" ]; then
+              echo "Génération de la doc pour : $dir"
+              # Création d'un sous-dossier dans docs/source pour éviter les collisions
+              mkdir -p docs/source/$dir
+              sphinx-apidoc -f -o docs/source/$dir ./$dir
+            fi
+          done
+
+      # 2. GÉNÉRER LE HTML
+      - name: Build Sphinx Documentation
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        working-directory: docs
+        run: |
+          # On crée 'public' à la racine (..)
+          mkdir -p ../public
+          
+          # IMPORTANT : On utilise 'uv run' pour appeler sphinx-build
+          uv run sphinx-build -n -b html source ../public
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: 'public'
+
+  deploy-docs:
+    needs: build-docs
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

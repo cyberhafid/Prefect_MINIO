@@ -1,0 +1,81 @@
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+    ports:
+      - 9090:9090
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - monitoring-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.50'
+
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - 3000:3000
+    restart: unless-stopped
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=grafana
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - grafana_data:/var/lib/grafana
+    networks:
+      - monitoring-network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.50'
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    expose:
+      - 9100
+    networks:
+      - monitoring-network
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.50'
+
+  uptime-kuma: 
+    image : louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime-kuma-data:/app/data
+    networks:
+      - monitoring-network
+    restart : unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.50'
+
+networks: 
+  monitoring-network:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.host_binding_ipv4: "127.0.0.1"
+    external: true 
+
+volumes:
+  grafana_data:
+  prometheus_data:
+  uptime-kuma-data:

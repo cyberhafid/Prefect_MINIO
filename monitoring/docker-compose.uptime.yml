@@ -1,0 +1,23 @@
+services:
+  uptime-kuma: 
+    image : louislam/uptime-kuma:1
+    container_name: uptime-kuma
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime-kuma-data:/app/data
+    networks:
+      - monitoring-network
+    restart : unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.50'
+
+volumes:
+  uptime-kuma-data:
+
+networks:
+  monitoring-network:
+    external: true

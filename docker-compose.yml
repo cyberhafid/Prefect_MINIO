@@ -1,0 +1,128 @@
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow
+    container_name: mlflow
+    depends_on: [minio]
+    ports: 
+    - "${MLFLOW_PORT:-5000}:${MLFLOW_PORT:-5000}"
+    environment:
+      - MINIO_PORT_S3=${MINIO_PORT_S3:-9000}
+      - MLFLOW_PORT=${MLFLOW_PORT:-5000}
+      - MLFLOW_S3_ENDPOINT_URL=http://minio:${MINIO_PORT_S3:-9000}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - MLFLOW_TRACKING_URI=http://mlflow:${MLFLOW_PORT:-5000}
+      - MLFLOW_HTTP_HOST_VALIDATION_DISABLED=true
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:////database/mlflow.db
+      --default-artifact-root s3://mlflow/
+      --host 0.0.0.0
+      --port ${MLFLOW_PORT:-5000}
+      --workers 1
+      --no-serve-artifacts
+      --allowed-hosts "*"
+    volumes:
+      - ./mlflow_data:/database
+    networks:
+      - api-backend
+      - prefect-network
+    deploy:
+      resources:
+        limits:
+          memory: 2096M
+          cpus: '6.0'
+          
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "${MINIO_PORT_S3:-9000}:${MINIO_PORT_S3:-9000}" # API S3
+      - "${MINIO_PORT_WEB:-9001}:${MINIO_PORT_WEB:-9001}" # Interface Web (Console)
+    environment:
+      MINIO_ROOT_USER: ${AWS_ACCESS_KEY_ID}
+      MINIO_ROOT_PASSWORD: ${AWS_SECRET_ACCESS_KEY}
+      MINIO_PORT_S3: ${MINIO_PORT_S3:-9000}
+      MINIO_PORT_WEB: ${MINIO_PORT_WEB:-9001}
+      MINIO_BROWSER_REDIRECT_URL: "http://minio:${MINIO_PORT_WEB:-9001}"
+      MLFLOW_TRACKING_URI: "http://mlflow:${MLFLOW_PORT:-5000}"
+    command: server /data --address ":${MINIO_PORT_S3:-9000}" --console-address ":${MINIO_PORT_WEB:-9001}"
+    volumes:
+      - minio_data:/data  # dossier /data de MinIO 
+    networks:
+      - api-backend
+      - prefect-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.50'
+
+  streamlit-app:
+    build:
+      context: ./src/app_front
+      dockerfile: Dockerfile
+    ports:
+      - "${STREAMLIT_PORT:-8501}:${STREAMLIT_PORT:-8501}"
+    env_file:
+      - .env
+    environment:
+      - STREAMLIT_SERVER_PORT=${STREAMLIT_PORT:-8501}
+      - API_URL=http://mon_api:${FASTAPI_PORT:-8000}
+    networks:
+      - front-api
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.50'
+
+  api-app:
+    build :
+      context: ./src/app_api
+      dockerfile: Dockerfile
+    container_name: mon_api
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - minio
+    ports:
+      - "${FASTAPI_PORT:-8000}:${FASTAPI_PORT:-8000}"
+    env_file:
+      - .env
+    restart: always
+    environment:
+      - FASTAPI_PORT=${FASTAPI_PORT:-8000}
+      - CELERY_BROKER_URL=${CELERY_BROKER_URL}
+      - CELERY_RESULT_BACKEND=${CELERY_RESULT_BACKEND}
+    networks:
+      - front-api
+      - api-backend
+      - prefect-network
+      - monitoring-network
+      - ml-network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.50'
+
+
+volumes:
+  minio_data:  
+  mlflow_data:
+
+networks:
+  front-api:
+    driver: bridge
+  api-backend: 
+    driver: bridge
+    external: true
+  prefect-network:
+    driver: bridge
+    external: true
+  monitoring-network:
+    driver: bridge
+    external: true
+  ml-network:
+    driver: bridge
+    external: true

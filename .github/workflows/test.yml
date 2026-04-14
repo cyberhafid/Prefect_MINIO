@@ -1,0 +1,125 @@
+name: Python Tests
+
+on:
+  push:
+    branches: [ main, dev, 'feat/**' ]
+  pull_request:
+    branches: [ main, dev ]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  build_app:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "src/app_*/uv.lock"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      # --- TESTS FRONT-END ---
+      - name: Install dependencies app_front
+        run: uv sync --project src/app_front --frozen --all-extras --all-groups
+
+      - name: Run Tests src/app_front
+        env:
+          FASTAPI_PORT: 8000
+        run: |
+          # Exécution et capture
+          uv run --project src/app_front pytest tests/ \
+            -c src/app_front/pyproject.toml \
+            --cov=src/app_front \
+            --cov-config=src/app_front/pyproject.toml \
+            --no-cov-on-fail \
+            --cov-report=term-missing \
+            --cov-report=xml\
+            > src/app_front/pytest_report_front.txt 2>&1 
+          
+          echo "### UI Front-end" >> $GITHUB_STEP_SUMMARY
+          if grep -q 'TOTAL' src/app_front/pytest_report_front.txt; then
+            grep 'TOTAL' src/app_front/pytest_report_front.txt | awk '{print "Couverture totale : " $NF}' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Aucun test trouvé ou erreur lors de l'exécution." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # --- TESTS API (BACK-END) ---
+      - name: Install dependencies app_api
+        run: uv sync --project src/app_api --frozen --all-extras --all-groups
+
+      - name: Run Tests app_api
+        env:
+          FASTAPI_PORT: 8000
+        run: |
+          # Exécution et capture
+          uv run --project src/app_api pytest tests/ \
+            -c src/app_api/pyproject.toml \
+            --cov=src/app_api \
+            --cov-config=src/app_api/pyproject.toml \
+            --no-cov-on-fail \
+            --cov-report=term-missing \
+            --cov-report=xml\
+            > src/app_api/pytest_report_front.txt 2>&1
+          
+          echo "### UI Back-end" >> $GITHUB_STEP_SUMMARY
+          if grep -q 'TOTAL' src/app_api/pytest_report_front.txt; then
+            grep 'TOTAL' src/app_api/pytest_report_front.txt | awk '{print "Couverture totale : " $NF}' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Aucun test trouvé ou erreur lors de l'exécution." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      # --- TESTS TRAIN (BACK-END) ---
+      - name: Install dependencies app_train
+        run: uv sync --project src/app_train --frozen --all-extras --all-groups
+
+      - name: Run Tests src/app_train
+        env:
+          FASTAPI_PORT: 8000
+        run: |
+          # Exécution et capture
+          uv run --project src/app_train pytest tests/ \
+            -c src/app_train/pyproject.toml \
+            --cov=src/app_train \
+            --cov-config=src/app_train/pyproject.toml \
+            --no-cov-on-fail \
+            --cov-report=term-missing \
+            --cov-report=xml\
+            > src/app_train/pytest_report_front.txt 2>&1
+          
+          echo "### UI Back-end" >> $GITHUB_STEP_SUMMARY
+          if grep -q 'TOTAL' src/app_train/pytest_report_front.txt; then
+            grep 'TOTAL' src/app_train/pytest_report_front.txt | awk '{print "Couverture totale : " $NF}' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Aucun test trouvé ou erreur lors de l'exécution." >> $GITHUB_STEP_SUMMARY
+          fi
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      # --- ARCHIVAGE ---
+      - name: Archive Code Coverage Results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: full-coverage-reports
+          path: |
+            src/app_front/pytest_report_front.txt
+            src/app_front/htmlcov_front/
+            src/app_api/pytest_report_api.txt
+            src/app_api/htmlcov_api/
+            src/app_train/pytest_report_api.txt
+            src/app_train/htmlcov_api/

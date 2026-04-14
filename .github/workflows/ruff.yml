@@ -1,0 +1,71 @@
+name: Python Ruff
+on:
+  push:
+    branches: [ main, dev , 'feat/**']  # Branch to survey
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    strategy:
+        matrix:
+            python-version: ["3.11"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: "src/app_*/uv.lock"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies src/app_front
+        run: uv sync --frozen --all-extras --all-groups
+        working-directory: src/app_front
+
+      - name: Run Ruff Check src/app_front
+        # Vérifie les erreurs de code et de logique
+        run: uv run ruff check .
+        working-directory: src/app_front
+
+      - name: Run Ruff Format src/app_front
+        # Vérifie que le code est bien formaté (équivalent de Black)
+        run: uv run ruff format --check .
+        working-directory: src/app_front
+
+      - name: Install dependencies src/app_api
+        run: uv sync --frozen --all-extras --all-groups
+        working-directory: src/app_api
+
+      - name: Run Ruff Check src/app_api
+        # Vérifie les erreurs de code et de logique
+        run: uv run ruff check .
+        working-directory: src/app_api
+
+      - name: Run Ruff Format src/app_api
+        # Vérifie que le code est bien formaté (équivalent de Black)
+        run: uv run ruff format --check .
+        working-directory: src/app_api
+
+      - name: Install dependencies src/app_train
+        run: uv sync --frozen --all-extras --all-groups
+        working-directory: src/app_train
+
+      - name: Run Ruff Check src/app_train
+        # Vérifie les erreurs de code et de logique
+        run: uv run ruff check .
+        working-directory: src/app_train
+
+      - name: Run Ruff Format src/app_train
+        # Vérifie que le code est bien formaté (équivalent de Black)
+        run: uv run ruff format --check .
+        working-directory: src/app_train
